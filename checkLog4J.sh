@@ -1,29 +1,43 @@
-#/bin/bash
-if [ "$(which java)" ]; then
-  echo "java is installed, so note that Java applications often bundle their libraries inside jar/war/ear files, so there still could be log4j in such applications.";
-fi;
-echo "Java version"
-if type -p java; then
-    echo found java executable in PATH
-    _java=java
-elif [[ -n "$JAVA_HOME" ]] && [[ -x "$JAVA_HOME/bin/java" ]];  then
-    echo found java executable in JAVA_HOME
-    _java="$JAVA_HOME/bin/java"
-else
-    echo "no java"
-fi
+#!/bin/bash
 
-if [[ "$_java" ]]; then
-    version=$("$_java" -version 2>&1 | awk -F '"' '/version/ {print $2}')
-    echo version "$version"
-fi
-echo "checking for log4j vulnerability...";
-if [ "$(find / -name 'log4j*' 2>/dev/null)" ]; then
-  echo "### maybe vulnerable, those files contain the name:";
-  find / -name 'log4j*' 2>/dev/null
+RED="\033[0;31m"; GREEN="\033[32m"; YELLOW="\033[1;33m"; ENDCOLOR="\033[0m"
+WARNING="[WARNING]"${ENDCOLOR}
+
+echo -e ${YELLOW}"### locate files containing log4j ..."${ENDCOLOR1}
+OUTPUT="$(find / -name 'log4j*' 2>/dev/null|grep -v log4js|grep -v log4j_checker_beta)"
+if [ "$OUTPUT" ]; then
+  echo -e ${RED}"[WARNING] maybe vulnerable, those files contain the name:"${ENDCOLOR}
+  echo "$OUTPUT"
 fi;
-#if [ "$(dpkg -l|grep log4j|grep -v log4js)" ]; then
-#  echo "### maybe vulnerable, installed packages:";
-#  dpkg -l|grep log4j;
-#fi;
-echo "If you see no output above this line, you are safe. Otherwise check the listed files and packages.";
+if [ "$(command -v yum)" ]; then
+  echo -e ${YELLOW}"### check installed yum packages ..."${ENDCOLOR1}
+  OUTPUT="$(yum list installed|grep log4j|grep -v log4js)"
+  if [ "$OUTPUT" ]; then
+    echo -e ${RED}"[WARNING] maybe vulnerable, yum installed packages:"${ENDCOLOR}
+    echo "$OUTPUT"
+  fi;
+fi;
+if [ "$(command -v dpkg)" ]; then
+  echo -e ${YELLOW}"### check installed dpkg packages ..."${ENDCOLOR1}
+  OUTPUT="$(dpkg -l|grep log4j|grep -v log4js)"
+  if [ "$OUTPUT" ]; then
+    echo -e ${RED}"[WARNING] maybe vulnerable, dpkg installed packages:"${ENDCOLOR}
+    echo "$OUTPUT"
+  fi;
+fi;
+echo -e ${YELLOW}"### check if Java is installed ..."${ENDCOLOR1}
+JAVA="$(command -v java)"
+if [ "$JAVA" ]; then
+  version=$(java -version 2>&1 | awk -F '"' '/version/ {print $2}')
+  echo -e ${RED}"[WARNING] Java is installed with version "$version${ENDCOLOR}
+  echo "Java applications often bundle their libraries inside jar/war/ear files, so there still could be log4j in such applications.";
+else
+  echo -e ${GREEN}"[OK]"${ENDCOLOR}" Java is not installed"
+fi;
+echo -e ${YELLOW}"_________________________________________________"${ENDCOLOR}
+echo "If you see no uncommented output above this line, you are safe. Otherwise check the listed files and packages.";
+if [ "$JAVA" == "" ]; then
+  echo "Some apps bundle the vulnerable library in their own compiled package, so 'java' might not be installed but one such apps could still be vulnerable."
+fi
+echo
+echo "Note, this is not 100% proof you are not vulnerable, but a strong hint!"
