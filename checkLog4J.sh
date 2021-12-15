@@ -1,7 +1,15 @@
 #!/bin/bash
 
+#set -x
+#trap read debug
 RED="\033[0;31m"; GREEN="\033[32m"; YELLOW="\033[1;33m"; ENDCOLOR="\033[0m"
-WARNING="[WARNING]"${ENDCOLOR}
+
+read -p "This script need unzip installed on the server. Do you want to continue ? (Y/N) " -n 1 -r
+echo    # (optional) move to a new line
+if [[ ! $REPLY =~ ^[Yy]$ ]]
+then
+    exit 1
+fi
 
 echo -e ${YELLOW}"### locate files containing log4j ..."${ENDCOLOR1}
 OUTPUT="$(find / -name 'log4j*' 2>/dev/null|grep -v log4js|grep -v log4j_checker_beta)"
@@ -33,6 +41,22 @@ if [ "$JAVA" ]; then
   echo "Java applications often bundle their libraries inside jar/war/ear files, so there still could be log4j in such applications.";
 else
   echo -e ${GREEN}"[OK]"${ENDCOLOR}" Java is not installed"
+fi;
+echo -e ${YELLOW}"### locate the files to look in more depth ..."${ENDCOLOR1}
+OUTPUT="$(find / -name '*.war' 2>/dev/null|grep -v log4js|grep -v log4j_checker_beta)"
+if [ "$OUTPUT" ]; then
+  echo -e ${RED}"[WARNING] .war detected :"${ENDCOLOR}
+  echo "$OUTPUT"
+  for file in $(find / -name '*.war' -type f 2>/dev/null)
+  do
+      OUTPUT="$(unzip -l ${file} |grep log4j* |awk -F '   ' '{print $3}')"
+      if [ "$OUTPUT" ]; then
+        echo -e ${RED}"[WARNING] maybe vulnerable, those files in war "${file}" contain the name:"${ENDCOLOR}
+        echo "$OUTPUT"
+      fi;
+  done
+else
+  echo -e ${GREEN}"[OK]"${ENDCOLOR}" No .war detected"
 fi;
 echo -e ${YELLOW}"_________________________________________________"${ENDCOLOR}
 echo "If you see no uncommented output above this line, you are safe. Otherwise check the listed files and packages.";
